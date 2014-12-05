@@ -7,12 +7,12 @@
 
 #define WIDTH 80
 #define HEIGHT 50
-
 #define PADDLE_HEIGHT 5
+#define SPEED_INCREASE 1.1
 
 #define PADDLE_BOTTOM(paddle_top) ((paddle_top) + PADDLE_HEIGHT - 1)
 
-#define TICK_TIME 100 * 1000 //uSeconds
+#define TICK_TIME 50 * 1000 //uSeconds
 
 void init_term();
 void init_game();
@@ -81,7 +81,7 @@ void init_term() {
 void init_game() {
 	int i;
 
-	vel_y = -1;
+	vel_y = 0.5;
 	vel_x = 1;
 
 	ball_y = 5;
@@ -133,14 +133,19 @@ void update() {
 
 		if(ball_x >= WIDTH - 2 || ball_x < 2) {//check paddles
 			int temp_paddle = ball_x < 2 ? l_paddle : r_paddle;
+			int hitdist = (int) ball_y - temp_paddle + PADDLE_HEIGHT / 2;
 
 			if(ball_y >= temp_paddle && ball_y < temp_paddle + PADDLE_HEIGHT) {
-				vel_x *= -1;
+				vel_x *= -1 * SPEED_INCREASE;
 				ball_x += vel_x;
 			}
 
 			else(lose());
+			vel_y += hitdist / 10;
 		}
+
+		l_paddle = ball_y - PADDLE_HEIGHT / 2;
+
 		break;
 	case LOST:
 		break;
