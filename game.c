@@ -14,6 +14,8 @@
 
 #define TICK_TIME 50 * 1000 //uSeconds
 
+int game_main(double *paddle_addr, int pid);
+
 void init_term();
 void init_game();
 void update();
@@ -34,6 +36,9 @@ char buffer[HEIGHT][WIDTH + 1];
 
 struct termios old_tio;
 
+double *net_paddle;
+int serv_pid;
+
 double ball_x;
 double ball_y;
 double vel_x;
@@ -42,8 +47,20 @@ int l_paddle;//coords of the top
 int r_paddle;
 
 
-int main() {
-	signal(SIGINT, fix_term);
+int game_main(double *paddle_addr, int pid) {
+	signal(SIGINT, fix_term);//If ctrl-c'ed, needs to return the terminal to normal
+
+	//net_paddle has been shmget'ed
+	//It's shmdt'ed in fix_term
+	//is a double from 0 to 1
+	net_paddle = paddle_addr; 
+		
+	printf("Net-Paddle: %lf\n", *net_paddle);
+	*net_paddle = 0.5;
+	printf("Net-Paddle: %lf\n", *net_paddle);
+
+	serv_pid = pid;
+
 
 	init_term();
 	init_game();
@@ -53,9 +70,13 @@ int main() {
 		update();
 		draw_buff();
 		print_buff();
+		printf("Net-Paddle: %lf\n", *net_paddle);
 	}
 
+	printf("EXITING\n");
 	fix_term(0);
+
+	return 0;
 }
 
 void init_term() {
@@ -144,12 +165,14 @@ void update() {
 			vel_y += hitdist / 10;
 		}
 
-		l_paddle = ball_y - PADDLE_HEIGHT / 2;
+		//l_paddle = ball_y - PADDLE_HEIGHT / 2;
+		l_paddle = 1 + (int)((HEIGHT - 2 - PADDLE_HEIGHT) * (*net_paddle));
 
 		break;
 	case LOST:
 		break;
 	case QUIT:
+		printf("Should be quitting\n");
 		break;
 	default:
 		err(-1, "Invalid state");
@@ -186,7 +209,7 @@ void print_buff(){
 }
 
 void lose(){
-	char gameover_string[] = "Game Over: r to restart, q to quit";
+	char gameover_string[] = "Game Over: r restart, q quit";
 
 	state = LOST;
 
@@ -202,8 +225,19 @@ void restart() {
 }
 
 void fix_term(int sig) {
+	int status;
+
 	tcsetattr(STDIN_FILENO,TCSANOW,&old_tio);
 	printf("[2J[H");
 	fflush(stdout);
+
+	shmdt(net_paddle);
+	printf("Did shmdt\n");
+	printf("Killing server: pid %d\n", serv_pid);
+	kill(serv_pid, SIGINT);
+	printf("Killed server\n");
+	wait(&status);
+	printf("Reaped child\n");
+
 	exit(0);
 }

@@ -1,5 +1,8 @@
 all:
-	gcc *.c
+	gcc client.? server.? util.? game.? pong.c -o pong
 
 run: all
-	./a.out
+	./pong
+
+clean:
+	rm pong
