@@ -5,14 +5,17 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define WIDTH 80
+#define WIDTH 120
 #define HEIGHT 50
-#define PADDLE_HEIGHT 5
-#define SPEED_INCREASE 1.1
+#define PADDLE_HEIGHT 7
+#define SPEED_INCREASE 1.05
+
+#define START_VEL_X 0.5
+#define START_VEL_Y 0.22
 
 #define PADDLE_BOTTOM(paddle_top) ((paddle_top) + PADDLE_HEIGHT - 1)
 
-#define TICK_TIME 50 * 1000 //uSeconds
+#define TICK_TIME 30 * 1000 //uSeconds
 
 int game_main(double *paddle_addr, int pid);
 
@@ -55,9 +58,9 @@ int game_main(double *paddle_addr, int pid) {
 	//is a double from 0 to 1
 	net_paddle = paddle_addr; 
 		
-	printf("Net-Paddle: %lf\n", *net_paddle);
+	//printf("Net-Paddle: %lf\n", *net_paddle);
 	*net_paddle = 0.5;
-	printf("Net-Paddle: %lf\n", *net_paddle);
+	//printf("Net-Paddle: %lf\n", *net_paddle);
 
 	serv_pid = pid;
 
@@ -70,7 +73,8 @@ int game_main(double *paddle_addr, int pid) {
 		update();
 		draw_buff();
 		print_buff();
-		printf("Net-Paddle: %lf\n", *net_paddle);
+		printf("vel_x: %lf, vel_y %lf\n", vel_x, vel_y);
+		//printf("Net-Paddle: %lf\n", *net_paddle);
 	}
 
 	printf("EXITING\n");
@@ -102,8 +106,8 @@ void init_term() {
 void init_game() {
 	int i;
 
-	vel_y = 0.5;
-	vel_x = 1;
+	vel_y = START_VEL_Y;
+	vel_x = START_VEL_X;
 
 	ball_y = 5;
 	ball_x = 2;
@@ -131,12 +135,18 @@ void update() {
 			state = QUIT;
 		} else if(c == 'j') {
 			r_paddle += 1;
+			if(r_paddle + PADDLE_HEIGHT + 1 > HEIGHT)
+				r_paddle = HEIGHT - PADDLE_HEIGHT - 1;
 		} else if(c == 'k') {
 			r_paddle -= 1;
+			if(r_paddle < 1)
+				r_paddle = 1;
 		} else if(c == 'r' && state == LOST) {
 			restart();
 		}
 	}
+
+	//l_paddle = 1 + (int)((HEIGHT - 2 - PADDLE_HEIGHT) * (*net_paddle));
 
 	switch(state) {
 	case PLAYING:
@@ -154,19 +164,18 @@ void update() {
 
 		if(ball_x >= WIDTH - 2 || ball_x < 2) {//check paddles
 			int temp_paddle = ball_x < 2 ? l_paddle : r_paddle;
-			int hitdist = (int) ball_y - temp_paddle + PADDLE_HEIGHT / 2;
+			int hitdist = (int) ball_y - temp_paddle - PADDLE_HEIGHT / 2;
 
-			if(ball_y >= temp_paddle && ball_y < temp_paddle + PADDLE_HEIGHT) {
+			if(ball_y >= temp_paddle && ball_y < temp_paddle + PADDLE_HEIGHT) {//If theres a paddle there
 				vel_x *= -1 * SPEED_INCREASE;
 				ball_x += vel_x;
+				vel_y += (double)hitdist / 50;
+			} else {
+				lose();
 			}
-
-			else(lose());
-			vel_y += hitdist / 10;
 		}
 
-		//l_paddle = ball_y - PADDLE_HEIGHT / 2;
-		l_paddle = 1 + (int)((HEIGHT - 2 - PADDLE_HEIGHT) * (*net_paddle));
+		l_paddle = ball_y - PADDLE_HEIGHT / 2;
 
 		break;
 	case LOST:
@@ -210,6 +219,8 @@ void print_buff(){
 
 void lose(){
 	char gameover_string[] = "Game Over: r restart, q quit";
+
+	draw_buff();
 
 	state = LOST;
 
