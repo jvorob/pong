@@ -202,9 +202,9 @@ void server_body() {//Takes a socket descriptor, gets shit done
 			for(i = 0; i < num_socks; i++) {
 				if(recv(sockets[i], &temp, 1, 0) > 0) {
 					printf("Received %c from %d\n", temp, i);
-					if(temp == 'j') {
+					if(temp == 'j' || temp == 's') {
 						last_num[i] = 1;
-					} else if(temp == 'k') {
+					} else if(temp == 'k' || temp == 'w') {
 						last_num[i] = 0;
 					}
 				}

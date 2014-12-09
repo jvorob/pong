@@ -89,7 +89,7 @@ int start_client() {
                 recv_buf[numbytes] = '\0';
                 printf("client: received '%s'\n", recv_buf);
 
-		printf("Enter chars\n");
+		printf("Enter chars: w or k to go up, s or j to go down\n");
 		while(1) {
 			int charbuff;
 			char tempchar;
