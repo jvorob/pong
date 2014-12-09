@@ -18,6 +18,6 @@
 int start_client();
 void send_to_server(char* buff, int length, int sockfd);
 void client_init_term();
-void client_fix_term(int sig);
+void client_fix_term(int sig);//Fixes things and exits
 
 #endif

@@ -6,6 +6,8 @@
 #define OLD_IP "107.170.106.89"
 #define LOCALHOST "127.0.0.1"
 
+#define PORT_BUFF_SIZE 50
+
 
 struct termios old_tio;
 
@@ -20,11 +22,23 @@ int start_client() {
         hints.ai_socktype = SOCK_STREAM;
         memset(&hints, 0, sizeof(hints));
 
+
+	char address[PORT_BUFF_SIZE];
+	FILE *ip_file = fopen("ip.cfg", "r");
+	if(ip_file == NULL) {
+		warn("Failed to open ip.cfg");
+		client_fix_term(0);
+	}
+	fgets(address, PORT_BUFF_SIZE, ip_file);
+	fclose(ip_file);
+
+	printf("Read address in from ip.cfg %s\n", address);
+
         // Open connection to server here
-        int rv = getaddrinfo(LOCALHOST, PORT, &hints, &servinfo);
+        int rv = getaddrinfo(address, PORT, &hints, &servinfo);
         if (rv != 0) {
                 fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-                return 1;
+		client_fix_term(0);
         }
 
         // loop through all the results and connect to the first we can
@@ -69,7 +83,7 @@ int start_client() {
                 // Receive from server
                 if ((numbytes = recv(sockfd, recv_buf, MAX_RECV_SIZE-1, 0)) == -1) {
                         perror("recv");
-                        exit(1);
+			client_fix_term(0);
                 }
 
                 recv_buf[numbytes] = '\0';
@@ -123,7 +137,7 @@ void send_to_server(char *msg, int length, int sockfd) {
 	
 }
 
-void client_fix_term(int sig) {
+void client_fix_term(int sig) {//Fixes things and exits
 	tcsetattr(STDIN_FILENO,TCSANOW,&old_tio);
 	printf("[2J[H");
 	fflush(stdout);
