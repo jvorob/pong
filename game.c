@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #define WIDTH 120
-#define HEIGHT 50
+#define HEIGHT 48 
 #define PADDLE_HEIGHT 7
 #define SPEED_INCREASE 1.05
 
@@ -16,6 +16,20 @@
 #define PADDLE_BOTTOM(paddle_top) ((paddle_top) + PADDLE_HEIGHT - 1)
 
 #define TICK_TIME 30 * 1000 //uSeconds
+
+//For paddle delay:
+//Highest number of frames that can be stored in the paddle position buffer
+#define MAX_DELAY_FRAMES 33
+//How many frames the delay jumps by each time
+#define DELAY_INTERVAL 8
+double past_paddle_pos[MAX_DELAY_FRAMES];
+//This tick, net_paddle will be placed in past_paddle_pos[curr_paddle_i]
+//and read from past_paddle_pos[fix_mod(past_paddle_pos - paddle_delay];
+int curr_paddle_i, paddle_delay;
+//makes x be modulo MAX_DELAY_FRAMES (assuming x > -MAX_DELAY_FRAMES)
+#define fix_mod(x) (((x) + MAX_DELAY_FRAMES) % MAX_DELAY_FRAMES)
+
+
 
 int game_main(double *paddle_addr, int pid);
 
@@ -51,6 +65,7 @@ int r_paddle;
 
 
 int game_main(double *paddle_addr, int pid) {
+	int i;
 	signal(SIGINT, fix_term);//If ctrl-c'ed, needs to return the terminal to normal
 
 	//net_paddle has been shmget'ed
@@ -67,6 +82,11 @@ int game_main(double *paddle_addr, int pid) {
 
 	init_term();
 	init_game();
+
+	//This probably oughta go in init_game(), but i dont want to call it on reset
+	for(i = 0; i < MAX_DELAY_FRAMES; i++)
+		past_paddle_pos[i] = 0.5;
+	curr_paddle_i = paddle_delay = 0;
 	
 	while(state != QUIT) {
 		usleep(TICK_TIME);
@@ -74,6 +94,7 @@ int game_main(double *paddle_addr, int pid) {
 		draw_buff();
 		print_buff();
 		printf("vel_x: %lf, vel_y %lf\n", vel_x, vel_y);
+		printf("Delaying net paddle by %2d frames\n", paddle_delay);
 		//printf("Net-Paddle: %lf\n", *net_paddle);
 	}
 
@@ -126,9 +147,11 @@ void init_game() {
 		buffer[HEIGHT - 1][i] = '#';
 	}
 
+
 }
 
 void update() {
+
 	char c;
 	while(read(STDIN_FILENO, &c, 1) != 0) {
 		if(c == 'q') {
@@ -141,15 +164,28 @@ void update() {
 			r_paddle -= 1;
 			if(r_paddle < 1)
 				r_paddle = 1;
-		} else if(c == 'r' && state == LOST) {
+		} else if(c == 'd') {//up delay
+			paddle_delay += DELAY_INTERVAL;
+			if(paddle_delay >= MAX_DELAY_FRAMES)
+				paddle_delay = 0;
+		} else if(c == 'r') {
 			restart();
 		}
 	}
 
-	//l_paddle = 1 + (int)((HEIGHT - 2 - PADDLE_HEIGHT) * (*net_paddle));
+	//l_paddle = ball_y - PADDLE_HEIGHT / 2;
+	
+	//Record current pos
+	past_paddle_pos[curr_paddle_i] =  *net_paddle;
+	//Get delayed pos
+	l_paddle = 1 + (int)((HEIGHT - 2 - PADDLE_HEIGHT) * 
+			past_paddle_pos[fix_mod(curr_paddle_i - paddle_delay)]);
+
+	//Increment
+	curr_paddle_i = fix_mod(curr_paddle_i + 1);
 
 	switch(state) {
-	case PLAYING:
+	case PLAYING://Moves the ball
 		ball_x += vel_x;
 		ball_y += vel_y;
 
@@ -175,7 +211,6 @@ void update() {
 			}
 		}
 
-		l_paddle = ball_y - PADDLE_HEIGHT / 2;
 
 		break;
 	case LOST:
@@ -199,7 +234,7 @@ void draw_buff() {
 			for(j = 1; j < HEIGHT - 1; j++)
 				buffer[j][i] = ' ';
 
-		buffer[(int) ball_y][(int) ball_x] = '*';
+		buffer[(int) ball_y][(int) ball_x] = '@';
 
 		for(i = 0; i < PADDLE_HEIGHT; i++) {
 			buffer[l_paddle + i][1] = '|';
